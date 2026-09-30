@@ -1,0 +1,27 @@
+[project]
+name = "diff2dict"
+version = "0.1.0"
+description = "Mine orthography and dialect differences from two aligned texts and emit a TECkit map."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "David Baines", email = "david_baines@sil.org" }]
+dependencies = [
+    "openpyxl>=3.1.5",
+    "regex>=2026.9.29",
+    "unicodedataplus>=16.0.0.post1",
+]
+
+[project.scripts]
+diff2dict = "diff2dict.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["diff2dict"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

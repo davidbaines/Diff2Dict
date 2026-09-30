@@ -1,0 +1,15 @@
+﻿rule,kind,direction,p_fwd,p_bwd,reason
+neighbours → neighbors,word,bwd,0.938,1.0,forward unreliable (p_fwd 0.94 < 0.95); this source has several targets
+defence → defense,word,bwd,0.632,1.0,forward unreliable (p_fwd 0.63 < 0.95); this source has several targets
+labour → labor,word,fwd,1.0,0.9,"reverse unreliable (p_bwd 0.90 < 0.95); the target also comes from other sources, so probably a merger"
+recognised → recognized,word,fwd,1.0,0.889,"reverse unreliable (p_bwd 0.89 < 0.95); the target also comes from other sources, so probably a merger"
+quarrelling → quarreling,word,bwd,0.833,1.0,forward unreliable (p_fwd 0.83 < 0.95); this source has several targets
+fulfil → fulfill,word,bwd,0.75,1.0,forward unreliable (p_fwd 0.75 < 0.95); this source has several targets
+realise → realize,word,fwd,1.0,0.75,"reverse unreliable (p_bwd 0.75 < 0.95); the target also comes from other sources, so probably a merger"
+sceptre → scepter,word,bwd,0.143,1.0,forward unreliable (p_fwd 0.14 < 0.95); this source has several targets
+skilful → skillful,word,bwd,0.5,1.0,forward unreliable (p_fwd 0.50 < 0.95); this source has several targets
+’ → ”,punct,bwd,0.948,0.967,forward unreliable (p_fwd 0.95 < 0.95); this source has several targets
+“ → ‘,punct,bwd,0.949,0.951,forward unreliable (p_fwd 0.95 < 0.95); this source has several targets
+l → ll / _ m,char,bwd,0.32,1.0,forward unreliable (p_fwd 0.32 < 0.95); this source has several targets
+s → z / y _,char,bwd,0.013,1.0,forward unreliable (p_fwd 0.01 < 0.95); this source has several targets
+l → ll / _ f,char,bwd,0.011,1.0,forward unreliable (p_fwd 0.01 < 0.95); this source has several targets
