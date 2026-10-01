@@ -52,9 +52,10 @@ The design came out of an interview. The main decisions, in order:
 
 - `diff2dict/` package: `unicodetools.py`, `tokens.py`, `align.py`, `mine.py`,
   `teckit.py`, `report.py`, `cli.py`.
-- Commands: `diff2dict scan-chars` and `diff2dict run`.
+- Command: `diff2dict SOURCE TARGET [options]` (add `--check-chars` to review the
+  character classes first, `--input-folder` to convert files with the map).
 - Outputs: `result.xlsx` (Summary, CharPairs, WordPairs, Lexicon, PunctPairs,
-  CaseOnly, SkippedLines), `rules.map`, and `oneway_rules.csv`.
+  CaseOnly, SkippedLines), `rules.map`, `rules.tec`, and `oneway_rules.csv`.
 - `sample/`: a small invented dialect pair covering `a → aa`, word-final `e`
   deletion, the one-way merger `oe → o`, a genuine swap (`pin → hunu`), a
   compound split (`ropilo → ropi lo`), a deleted particle, a quote swap,
@@ -162,7 +163,7 @@ for good.
 ```
 uv sync
 TECKIT_DIR=/path/to/teckit/bin uv run pytest
-uv run diff2dict run data/oeb-british.txt data/oeb-american.txt \
+uv run diff2dict data/oeb-british.txt data/oeb-american.txt \
     --chars examples/oeb-chars.csv --out examples/British2American.xlsx \
     --map examples/British2American.map --oneway examples/British2American_oneway.csv \
     --lhs-name British --rhs-name American

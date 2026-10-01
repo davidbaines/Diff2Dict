@@ -112,7 +112,7 @@ def read_chars_csv(path: str | Path) -> dict[str, str]:
 def write_chars_csv(path: str | Path, counts: Counter[str],
                     existing: dict[str, str] | None = None) -> None:
     """Write the editable character table. Classes already chosen in
-    `existing` are kept, so re-running scan-chars never loses user edits."""
+    `existing` are kept, so re-running the scan never loses user edits."""
     existing = existing or {}
     rows = sorted(counts, key=lambda g: (category(g)[0] not in "LMN", category(g), g))
     with open(path, "w", encoding="utf-8-sig", newline="") as f:

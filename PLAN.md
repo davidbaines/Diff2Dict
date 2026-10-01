@@ -77,7 +77,7 @@ at generation time.
 
 ## Algorithm: mining
 
-**Stage A: character classification (two-pass, always).** `scan-chars` NFC-
+**Stage A: character classification (two-pass, always).** The character scan NFC-
 normalises both files, enumerates every distinct grapheme, writes `chars.csv`
 (`char, codepoints, unicode_name, category, suggested_class, class`). Suggested from
 Unicode category (L*/M* → word, P*/S*/Z* → punctuation, apostrophes → both). User
@@ -146,7 +146,7 @@ Lexicon.
 ## Files to create
 
 - `diff2dict/` package:
-  - `cli.py`: argparse subcommands `scan-chars`, `run`.
+  - `cli.py`: one argparse command, `diff2dict SOURCE TARGET [options]`.
   - `unicodetools.py`: NFC, grapheme splitting, char classification, CSV IO.
   - `tokens.py`: line to word and punctuation tokens (class map plus 'both' rule).
     Not named `tokenize.py`, which would shadow the stdlib module.
@@ -171,18 +171,18 @@ Lexicon.
 
 ```
 # uv manages the venv; a `diff2dict` console script is defined in pyproject.toml.
-uv run diff2dict scan-chars SRC TGT --chars chars.csv
-uv run diff2dict run SRC TGT --chars chars.csv --out result.xlsx --map rules.map \
-    [--threshold 0.7] [--min-count 2] [--max-iter 5] [--reliability 0.95] \
-    [--review rules.csv]
+uv run diff2dict SRC TGT --chars chars.csv --out result.xlsx --map rules.map \
+    [--check-chars] [--threshold 0.7] [--min-count 2] [--max-iter 5] \
+    [--reliability 0.95] [--review rules.csv] \
+    [--input-folder texts_in --input-ext txt --output-folder texts_out [-r]]
 ```
 
 ## Verification
 
 1. `uv sync` installs `regex`, `openpyxl`, `unicodedataplus`, with no native deps.
-2. `scan-chars` on `sample/` then inspect `chars.csv`: letters=word, punct=punct,
+2. `--check-chars` on `sample/` then inspect `chars.csv`: letters=word, punct=punct,
    apostrophe=both, combining marks=word, `ʼ` U+02BC listed separately.
-3. `run` on `sample/` then open `result.xlsx`: CharPairs has `a`→`aa` and the `e`→∅
+3. a default run on `sample/` then open `result.xlsx`: CharPairs has `a`→`aa` and the `e`→∅
    context rule with counts and per-direction probabilities; WordPairs has the
    genuine swap only; Lexicon holds regular and genuine pairs but no identical ones;
    PunctPairs has the punctuation swap; SkippedLines empty for the all-related

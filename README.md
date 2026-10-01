@@ -16,34 +16,58 @@ Diff2Dict needs Python 3.10 or later and [uv](https://docs.astral.sh/uv/).
 uv sync
 ```
 
-## Two-pass workflow
+## Workflow
 
-1. List every character so you can check how each one is classified:
+One command mines the differences, writes the outputs and compiles the map:
 
-   ```
-   uv run diff2dict scan-chars source.txt target.txt --chars chars.csv
-   ```
+```
+uv run diff2dict source.txt target.txt --chars chars.csv \
+    --out result.xlsx --map rules.map
+```
 
-   Open `chars.csv` and check the `class` column. Each character is `word`,
-   `punctuation` or `both`. A `both` character, such as `'`, is part of a word
-   only when it sits between two word-forming characters. Rows are matched by
-   the `codepoints` column, so it does not matter if a spreadsheet mangles the
-   `char` column. Re-running `scan-chars` keeps the classes you have set.
-   Whitespace always separates words, so it is not listed.
+If `chars.csv` does not exist, it is written with a suggested class for every
+character and the run continues using those suggestions.
 
-2. Mine the differences:
+To check the classes first, add `--check-chars`:
 
-   ```
-   uv run diff2dict run source.txt target.txt --chars chars.csv \
-       --out result.xlsx --map rules.map
-   ```
+```
+uv run diff2dict source.txt target.txt --chars chars.csv --check-chars
+```
 
-   If `chars.csv` does not exist yet, `run` writes it and stops.
+The first time, this writes `chars.csv` and stops with the command to run next.
+Open the file and check the `class` column. Each character is `word`,
+`punctuation` or `both`. A `both` character, such as `'`, is part of a word only
+when it sits between two word-forming characters. Rows are matched by the
+`codepoints` column, so it does not matter if a spreadsheet mangles the `char`
+column. Leave no class blank. Whitespace always separates words, so it is not
+listed. Run the same command again: it finds `chars.csv`, pauses for a last
+check, and continues when you press Enter. Re-running keeps the classes you set.
+
+### Convert files with the map
+
+Give an input folder, an extension and an output folder, and the files are
+converted with the compiled map:
+
+```
+uv run diff2dict source.txt target.txt --chars chars.csv --map rules.map \
+    --input-folder texts_in --input-ext txt --output-folder texts_out
+```
+
+The extension works with or without the dot; `*`, `.*` or `*.*` convert every
+text file in the folder, skipping binaries. The scan is not recursive. Add `-r`
+(or `--reverse`) to convert target to source. Conversion uses `txtconv`, so the
+teckit package must be installed.
 
 Useful options:
 
 | Option | Default | Meaning |
 |---|---|---|
+| `--check-chars` | off | Pause to review the character classes before mining |
+| `--tec` | map path with `.tec` | Compiled table, written when `teckit_compile` is found |
+| `--input-folder` | | Folder of files to convert with the compiled map |
+| `--input-ext` | | Extension to convert; `*`, `.*` or `*.*` means every text file |
+| `--output-folder` | | Where converted files are written; must differ from the input |
+| `-r`, `--reverse` | off | Convert target to source instead of source to target |
 | `--threshold` | 0.7 | Line similarity below which a pair is skipped as unrelated |
 | `--min-count` | 2 | Rules and word pairs seen fewer times are dropped |
 | `--max-iter` | 5 | Bootstrapping passes at most |
@@ -90,21 +114,22 @@ merge into one target form. `oneway_rules.csv` lists those rules and why.
 
 ## Applying the map
 
-Compile the map, then convert text with `txtconv` (add `-r` to convert the
-other way):
+Diff2Dict compiles the map for you and, with `--input-folder`, converts a whole
+folder (see above). To convert a single file yourself, use `txtconv` with the
+compiled `.tec` (add `-r` to convert the other way):
 
 ```
-teckit_compile rules.map -o rules.tec
 txtconv -t rules.tec -i source.txt -o converted.txt -nobom
 txtconv -t rules.tec -i target.txt -o back.txt -r -nobom
 ```
 
-The map can also be added to [SIL Converters](https://software.sil.org/silconverters/),
+Recompile the `.tec` whenever the map changes, or let Diff2Dict do it. The map
+can also be added to [SIL Converters](https://software.sil.org/silconverters/),
 which applies it in Paratext, FieldWorks, Word and SFM files.
 
-If `teckit_compile` and `txtconv` are on your PATH when you run `diff2dict run`,
-the map is compiled and scored on the held-out lines, and the Summary shows the
-result. Otherwise the Summary says evaluation was skipped. Either way the
+If `teckit_compile` and `txtconv` are on your PATH, the map is compiled and
+scored on the held-out lines, and the Summary shows the result. Otherwise the
+Summary says evaluation was skipped, and the `.tec` is not written. Either way the
 Summary also shows a simulated score, which comes from Diff2Dict's own model
 of how TECkit applies the rules. TECkit for Windows, macOS and Linux is at
 <https://github.com/silnrsi/teckit/releases>.
@@ -116,14 +141,14 @@ of how TECkit applies the rules. TECkit for Windows, macOS and Linux is at
 of:
 
 ```
-uv run diff2dict run data/oeb-british.txt data/oeb-american.txt \
+uv run diff2dict data/oeb-british.txt data/oeb-american.txt \
     --chars examples/oeb-chars.csv --out examples/British2American.xlsx \
     --map examples/British2American.map --oneway examples/British2American_oneway.csv \
     --lhs-name British --rhs-name American
 ```
 
 It finds word rules such as `honour → honor`, `recognise → recognize` and
-`plough → plow`, and the swap of outer quotation marks, `‘ → “`. On held-out
+`plough → plow`, and the swap of quotation marks, `‘ → “` and `’ → ”`. On held-out
 verses, TECkit's conversion raises word accuracy from 0.997 to 0.999 in both
 directions. The remaining differences are lexical choices such as
 `round → around`, which are not consistent enough to become rules.
