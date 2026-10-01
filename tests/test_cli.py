@@ -16,22 +16,19 @@ def copy_sample(tmp_path):
 
 
 def base_args(src, tgt, tmp_path):
-    return [str(src), str(tgt), "--chars", str(tmp_path / "chars.csv"),
-            "--out", str(tmp_path / "r.xlsx"), "--map", str(tmp_path / "r.map"),
-            "--holdout", "0"]
+    return [str(src), str(tgt), "--name", "r", "--out-dir", str(tmp_path), "--holdout", "0"]
 
 
 def test_check_chars_without_file_generates_them_and_stops(tmp_path):
     src, tgt = copy_sample(tmp_path)
-    chars = tmp_path / "chars.csv"
     code = main(base_args(src, tgt, tmp_path) + ["--check-chars"], ask=lambda _: "")
     assert code == 2
-    assert chars.exists() and not (tmp_path / "r.xlsx").exists()
+    assert (tmp_path / "r_chars.csv").exists() and not (tmp_path / "r.xlsx").exists()
 
 
 def test_check_chars_with_file_pauses_then_runs(tmp_path):
     src, tgt = copy_sample(tmp_path)
-    main(base_args(src, tgt, tmp_path) + ["--check-chars"], ask=lambda _: "")  # writes chars.csv
+    main(base_args(src, tgt, tmp_path) + ["--check-chars"], ask=lambda _: "")  # writes chars
     asked = []
     code = main(base_args(src, tgt, tmp_path) + ["--check-chars"], ask=lambda p: asked.append(p) or "")
     assert code == 0 and asked and (tmp_path / "r.xlsx").exists()
@@ -39,19 +36,27 @@ def test_check_chars_with_file_pauses_then_runs(tmp_path):
 
 def test_default_run_generates_chars_and_completes(tmp_path):
     src, tgt = copy_sample(tmp_path)
-    chars, out, map_path = tmp_path / "chars.csv", tmp_path / "r.xlsx", tmp_path / "r.map"
     assert main(base_args(src, tgt, tmp_path)) == 0
-    assert chars.exists()
-    wb = openpyxl.load_workbook(out)
+    assert (tmp_path / "r_chars.csv").exists()
+    wb = openpyxl.load_workbook(tmp_path / "r.xlsx")
     assert wb.sheetnames == ["Summary", "CharPairs", "WordPairs", "Lexicon", "PunctPairs",
                              "CaseOnly", "SkippedLines"]
     word_pairs = [r[:3] for r in wb["WordPairs"].iter_rows(min_row=2, values_only=True)]
     assert ("pin", "hunu", "substitution") in word_pairs
     skipped = [r[0] for r in wb["SkippedLines"].iter_rows(min_row=2, values_only=True)]
     assert skipped == [15]
-    assert map_path.exists() and (tmp_path / "oneway_rules.csv").exists()
-    oneway = (tmp_path / "oneway_rules.csv").read_text(encoding="utf-8-sig")
+    assert (tmp_path / "r.map").exists() and (tmp_path / "r_oneway.csv").exists()
+    oneway = (tmp_path / "r_oneway.csv").read_text(encoding="utf-8-sig")
     assert "e → ∅ / o _" in oneway
+
+
+def test_name_defaults_from_lhs_and_rhs(tmp_path):
+    src, tgt = copy_sample(tmp_path)
+    out = tmp_path / "out"
+    assert main([str(src), str(tgt), "--lhs-name", "Brit", "--rhs-name", "Amer",
+                 "--out-dir", str(out), "--holdout", "0"]) == 0
+    for suffix in (".map", ".xlsx", ".tec", "_oneway.csv", "_chars.csv"):
+        assert (out / f"Brit2Amer{suffix}").exists()
 
 
 def test_select_files_by_extension_and_all_text(tmp_path):
@@ -65,25 +70,24 @@ def test_select_files_by_extension_and_all_text(tmp_path):
         assert [p.name for p in select_files(tmp_path, marker)] == ["a.txt", "b.sfm"]
 
 
-def test_conversion_requires_ext_and_output(tmp_path):
+def test_conversion_rejects_missing_input_folder(tmp_path):
     src, tgt = copy_sample(tmp_path)
     with pytest.raises(SystemExit):
-        main(base_args(src, tgt, tmp_path) + ["--input-folder", str(tmp_path)])
+        main(base_args(src, tgt, tmp_path) + ["--input-folder", str(tmp_path / "nope")])
 
 
 @teckit_missing
-def test_full_pipeline_compiles_and_converts_a_folder(tmp_path):
+def test_full_pipeline_converts_with_derived_paths(tmp_path):
     src, tgt = copy_sample(tmp_path)
-    in_folder, out_folder = tmp_path / "in", tmp_path / "out"
+    in_folder = tmp_path / "in"
     in_folder.mkdir()
     (in_folder / "one.txt").write_text((SAMPLE / "source.txt").read_text(encoding="utf-8"),
                                        encoding="utf-8")
-    code = main(base_args(src, tgt, tmp_path)
-                + ["--input-folder", str(in_folder), "--input-ext", "txt",
-                   "--output-folder", str(out_folder), "--tec", str(tmp_path / "r.tec")])
+    # No --input-ext (defaults to all text) and no --output-folder (derives).
+    code = main(base_args(src, tgt, tmp_path) + ["--input-folder", str(in_folder)])
     assert code == 0
     assert (tmp_path / "r.tec").exists()
-    converted = (out_folder / "one.txt").read_text(encoding="utf-8").splitlines()
+    converted = (tmp_path / "r_converted" / "one.txt").read_text(encoding="utf-8").splitlines()
     target = (SAMPLE / "target.txt").read_text(encoding="utf-8").splitlines()
     # Line 1 (kala -> kaalaa) is converted by the compiled map.
     assert converted[0] == target[0]

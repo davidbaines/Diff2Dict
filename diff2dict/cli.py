@@ -87,11 +87,26 @@ def select_files(folder: Path, ext: str) -> list[Path]:
     return [p for p in files if p.suffix.lower() == suffix]
 
 
+def _derive_paths(args: argparse.Namespace) -> None:
+    """Fill in the output paths that were not given, from --name and --out-dir."""
+    name = args.name
+    if not name:
+        if args.lhs_name and args.rhs_name:
+            name = f"{args.lhs_name}2{args.rhs_name}"
+        else:
+            name = f"{args.source.stem}2{args.target.stem}"
+    d = args.out_dir
+    args.chars = args.chars or d / f"{name}_chars.csv"
+    args.map = args.map or d / f"{name}.map"
+    args.tec = args.tec or d / f"{name}.tec"
+    args.out = args.out or d / f"{name}.xlsx"
+    args.oneway = args.oneway or d / f"{name}_oneway.csv"
+    args.output_folder = args.output_folder or d / f"{name}_converted"
+
+
 def _validate_conversion(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
     """Check conversion arguments and tools before any mining, so a mistake costs
     nothing. Exits through parser.error."""
-    if args.input_ext is None or args.output_folder is None:
-        parser.error("--input-folder needs both --input-ext and --output-folder")
     if not args.input_folder.is_dir():
         parser.error(f"input folder not found: {args.input_folder}")
     if args.input_folder.resolve() == args.output_folder.resolve():
@@ -124,9 +139,11 @@ def _convert_folder(args: argparse.Namespace, tec: Path, txtconv: str) -> int:
 
 def run(args: argparse.Namespace, invocation: str, parser: argparse.ArgumentParser,
         ask: Callable[[str], str] = input) -> int:
+    _derive_paths(args)
     convert = args.input_folder is not None
     if convert:
         _validate_conversion(args, parser)
+    args.out_dir.mkdir(parents=True, exist_ok=True)
 
     classes = resolve_chars(args, invocation, ask)
     if classes is None:
@@ -144,7 +161,7 @@ def run(args: argparse.Namespace, invocation: str, parser: argparse.ArgumentPars
     teckit.write_map(args.map, result.map_rules, result.word_chars, result.mark_chars,
                      result.both_chars,
                      lhs, rhs, f"Text as in {args.source.name}", f"Text as in {args.target.name}")
-    oneway = args.oneway or args.map.with_name("oneway_rules.csv")
+    oneway = args.oneway
     report.write_oneway_csv(oneway, teckit.oneway_rows(result.map_rules, result.unmapped,
                                                        params.reliability))
     tk = teckit.teckit_evaluate(args.map, result.held, classes)
@@ -189,7 +206,7 @@ def run(args: argparse.Namespace, invocation: str, parser: argparse.ArgumentPars
         print(f"Held-out word accuracy: {ev['baseline']:.3f} before, "
               f"{ev['forward']:.3f} forward, {ev['backward']:.3f} backward (simulated).")
 
-    tec = args.tec or args.map.with_suffix(".tec")
+    tec = args.tec
     compiler, txtconv = teckit.find_tools()
     if convert:
         ok, message = teckit.compile_map(compiler, args.map, tec)
@@ -209,30 +226,40 @@ def run(args: argparse.Namespace, invocation: str, parser: argparse.ArgumentPars
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="diff2dict", description=(
+    p = argparse.ArgumentParser(prog="diff2dict", fromfile_prefix_chars="@", description=(
         "Mine character rules and word substitutions from two line-aligned texts, "
-        "write them as a TECkit map, compile it, and optionally convert a folder."))
+        "write them as a TECkit map, compile it, and optionally convert a folder. "
+        "Arguments can be read from a file with @file, one argument per line."))
     p.add_argument("--version", action="version", version=__version__)
     p.add_argument("source", type=Path)
     p.add_argument("target", type=Path)
-    p.add_argument("--chars", type=Path, default=Path("chars.csv"))
+    p.add_argument("--name", default=None,
+                   help="stem for the output files (default: <lhs-name>2<rhs-name>, "
+                        "or <source>2<target>)")
+    p.add_argument("--out-dir", type=Path, default=Path("."),
+                   help="folder for the output files, created if missing (default: .)")
+    p.add_argument("--chars", type=Path, default=None,
+                   help="character classes (default: <name>_chars.csv in the output folder)")
     p.add_argument("--check-chars", action="store_true",
                    help="pause to review the character classes before mining")
-    p.add_argument("--out", type=Path, default=Path("result.xlsx"))
-    p.add_argument("--map", type=Path, default=Path("rules.map"))
+    p.add_argument("--out", type=Path, default=None,
+                   help="workbook (default: <name>.xlsx in the output folder)")
+    p.add_argument("--map", type=Path, default=None,
+                   help="TECkit map (default: <name>.map in the output folder)")
     p.add_argument("--tec", type=Path, default=None,
-                   help="compiled table (default: the map path with a .tec suffix)")
+                   help="compiled table (default: <name>.tec in the output folder)")
     p.add_argument("--oneway", type=Path, default=None,
-                   help="one-way rules report (default: oneway_rules.csv next to the map)")
+                   help="one-way rules report (default: <name>_oneway.csv in the output folder)")
 
     c = p.add_argument_group("conversion")
     c.add_argument("--input-folder", type=Path, default=None,
                    help="convert the files in this folder (not recursive)")
-    c.add_argument("--input-ext", default=None,
+    c.add_argument("--input-ext", default="*",
                    help="extension to convert, with or without the dot; "
-                        "*, .* or *.* means every text file")
+                        "*, .* or *.* means every text file (default: all text files)")
     c.add_argument("--output-folder", type=Path, default=None,
-                   help="where converted files are written; must differ from the input")
+                   help="where converted files are written; must differ from the input "
+                        "(default: <name>_converted in the output folder)")
     c.add_argument("-r", "--reverse", action="store_true",
                    help="convert target to source instead of source to target")
 

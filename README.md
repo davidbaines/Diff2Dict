@@ -18,55 +18,81 @@ uv sync
 
 ## Workflow
 
-One command mines the differences, writes the outputs and compiles the map:
+One command mines the differences, writes the outputs and compiles the map. One
+`--name` gives every output file a common stem, and `--out-dir` puts them in one
+folder:
 
 ```
-uv run diff2dict source.txt target.txt --chars chars.csv \
-    --out result.xlsx --map rules.map
+uv run diff2dict source.txt target.txt --name English2Dialect --out-dir project
 ```
 
-If `chars.csv` does not exist, it is written with a suggested class for every
+That writes `English2Dialect.map`, `.tec`, `.xlsx`, `_oneway.csv` and
+`_chars.csv` into `project/`. If you give `--lhs-name` and `--rhs-name`, the name
+defaults to `<lhs>2<rhs>`, so you need not set `--name`. Each output can still be
+pointed somewhere else with `--map`, `--out`, `--tec`, `--oneway` or `--chars`.
+
+If the chars file does not exist, it is written with a suggested class for every
 character and the run continues using those suggestions.
 
 To check the classes first, add `--check-chars`:
 
 ```
-uv run diff2dict source.txt target.txt --chars chars.csv --check-chars
+uv run diff2dict source.txt target.txt --name English2Dialect --check-chars
 ```
 
-The first time, this writes `chars.csv` and stops with the command to run next.
-Open the file and check the `class` column. Each character is `word`,
+The first time, this writes the chars file and stops with the command to run
+next. Open the file and check the `class` column. Each character is `word`,
 `punctuation` or `both`. A `both` character, such as `'`, is part of a word only
 when it sits between two word-forming characters. Rows are matched by the
 `codepoints` column, so it does not matter if a spreadsheet mangles the `char`
 column. Leave no class blank. Whitespace always separates words, so it is not
-listed. Run the same command again: it finds `chars.csv`, pauses for a last
-check, and continues when you press Enter. Re-running keeps the classes you set.
+listed. Run the same command again: it finds the file, pauses for a last check,
+and continues when you press Enter. Re-running keeps the classes you set.
 
 ### Convert files with the map
 
-Give an input folder, an extension and an output folder, and the files are
-converted with the compiled map:
+Add an input folder and the files in it are converted with the compiled map:
 
 ```
-uv run diff2dict source.txt target.txt --chars chars.csv --map rules.map \
-    --input-folder texts_in --input-ext txt --output-folder texts_out
+uv run diff2dict source.txt target.txt --name English2Dialect \
+    --input-folder texts_in
 ```
 
-The extension works with or without the dot; `*`, `.*` or `*.*` convert every
-text file in the folder, skipping binaries. The scan is not recursive. Add `-r`
-(or `--reverse`) to convert target to source. Conversion uses `txtconv`, so the
-teckit package must be installed.
+Converted files go to `<name>_converted` in the output folder. By default every
+text file is converted; set `--input-ext` to limit it to one extension (with or
+without the dot; `*`, `.*` or `*.*` mean all text files). Set `--output-folder`
+to choose the destination. The scan is not recursive. Add `-r` (or `--reverse`)
+to convert target to source. Conversion uses `txtconv`, so the teckit package
+must be installed.
+
+### Save a project
+
+Arguments can be read from a file with `@`, one argument per line. Use the
+`--option=value` form:
+
+```
+# english2dialect.args
+source.txt
+target.txt
+--name=English2Dialect
+--out-dir=project
+--input-folder=texts_in
+```
+
+```
+uv run diff2dict @english2dialect.args
+```
 
 Useful options:
 
 | Option | Default | Meaning |
 |---|---|---|
+| `--name` | `<lhs>2<rhs>` or `<source>2<target>` | Stem for every output file |
+| `--out-dir` | `.` | Folder for the output files, created if missing |
 | `--check-chars` | off | Pause to review the character classes before mining |
-| `--tec` | map path with `.tec` | Compiled table, written when `teckit_compile` is found |
 | `--input-folder` | | Folder of files to convert with the compiled map |
-| `--input-ext` | | Extension to convert; `*`, `.*` or `*.*` means every text file |
-| `--output-folder` | | Where converted files are written; must differ from the input |
+| `--input-ext` | all text files | Extension to convert; `*`, `.*` or `*.*` means every text file |
+| `--output-folder` | `<name>_converted` | Where converted files are written; must differ from the input |
 | `-r`, `--reverse` | off | Convert target to source instead of source to target |
 | `--threshold` | 0.7 | Line similarity below which a pair is skipped as unrelated |
 | `--min-count` | 2 | Rules and word pairs seen fewer times are dropped |
@@ -76,7 +102,7 @@ Useful options:
 | `--seed` | 1 | Seed for the held-out split |
 | `--review FILE` | | Pause after the first pass so you can edit the mined rules |
 | `--lhs-name`, `--rhs-name` | file names | Names written into the map header |
-| `--oneway FILE` | next to the map | Report of rules that work one way only |
+| `--map`, `--out`, `--tec`, `--oneway`, `--chars` | from `--name` | Override an individual output path |
 
 With `--review rules.csv` the first pass writes `rules.csv` and waits. Set
 `keep` to 0 to reject a rule or 1 to force an unreliable one, then press Enter.
@@ -88,7 +114,7 @@ skipped when either side has one. They are counted in the Summary sheet.
 
 ## Outputs
 
-`result.xlsx` has these sheets:
+The workbook (`<name>.xlsx`) has these sheets:
 
 | Sheet | Contents |
 |---|---|
@@ -108,9 +134,10 @@ Every aligned word pair is one of three kinds:
 | Regular | `banana` → `baanaanaa` | The words differ, but a character rule already turns one into the other. |
 | Genuine | `dog` → `hound` | No character rule explains the change, so it becomes a word rule. |
 
-`rules.map` is a TECkit mapping source. Rules written `<>` work both ways. A
-rule written `>` or `<` works one way only, usually because two source forms
-merge into one target form. `oneway_rules.csv` lists those rules and why.
+The map (`<name>.map`) is a TECkit mapping source. Rules written `<>` work both
+ways. A rule written `>` or `<` works one way only, usually because two source
+forms merge into one target form. The one-way report (`<name>_oneway.csv`) lists
+those rules and why.
 
 ## Applying the map
 
@@ -142,8 +169,7 @@ of:
 
 ```
 uv run diff2dict data/oeb-british.txt data/oeb-american.txt \
-    --chars examples/oeb-chars.csv --out examples/British2American.xlsx \
-    --map examples/British2American.map --oneway examples/British2American_oneway.csv \
+    --chars examples/oeb-chars.csv --out-dir examples \
     --lhs-name British --rhs-name American
 ```
 

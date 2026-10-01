@@ -171,10 +171,11 @@ Lexicon.
 
 ```
 # uv manages the venv; a `diff2dict` console script is defined in pyproject.toml.
-uv run diff2dict SRC TGT --chars chars.csv --out result.xlsx --map rules.map \
+uv run diff2dict SRC TGT --name NAME --out-dir DIR \
     [--check-chars] [--threshold 0.7] [--min-count 2] [--max-iter 5] \
     [--reliability 0.95] [--review rules.csv] \
-    [--input-folder texts_in --input-ext txt --output-folder texts_out [-r]]
+    [--input-folder texts_in [--input-ext txt] [--output-folder texts_out] [-r]]
+# Outputs derive from --name; @file reads arguments from a file.
 ```
 
 ## Verification

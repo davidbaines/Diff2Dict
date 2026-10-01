@@ -54,8 +54,11 @@ The design came out of an interview. The main decisions, in order:
   `teckit.py`, `report.py`, `cli.py`.
 - Command: `diff2dict SOURCE TARGET [options]` (add `--check-chars` to review the
   character classes first, `--input-folder` to convert files with the map).
-- Outputs: `result.xlsx` (Summary, CharPairs, WordPairs, Lexicon, PunctPairs,
-  CaseOnly, SkippedLines), `rules.map`, `rules.tec`, and `oneway_rules.csv`.
+- `--name` and `--out-dir` give every output a common stem in one folder;
+  `@file` reads arguments from a file.
+- Outputs (named from `--name`): `<name>.xlsx` (Summary, CharPairs, WordPairs,
+  Lexicon, PunctPairs, CaseOnly, SkippedLines), `<name>.map`, `<name>.tec`,
+  `<name>_oneway.csv` and `<name>_chars.csv`.
 - `sample/`: a small invented dialect pair covering `a → aa`, word-final `e`
   deletion, the one-way merger `oe → o`, a genuine swap (`pin → hunu`), a
   compound split (`ropilo → ropi lo`), a deleted particle, a quote swap,
@@ -164,8 +167,7 @@ for good.
 uv sync
 TECKIT_DIR=/path/to/teckit/bin uv run pytest
 uv run diff2dict data/oeb-british.txt data/oeb-american.txt \
-    --chars examples/oeb-chars.csv --out examples/British2American.xlsx \
-    --map examples/British2American.map --oneway examples/British2American_oneway.csv \
+    --chars examples/oeb-chars.csv --out-dir examples \
     --lhs-name British --rhs-name American
 ```
 
