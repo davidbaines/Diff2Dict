@@ -490,12 +490,15 @@ def classify_pairs(aligned, fwd: "teckit.Converter",
     return result, case_only
 
 
-def mine_punct(aligned, params: Params) -> list[PunctPair]:
+def _punct_subs(aligned, model: CostModel
+                ) -> tuple[Counter, dict[tuple[str, str], list[int]], Counter, Counter]:
+    """Count 1:1 punctuation substitutions across aligned lines, with the source
+    and target punctuation populations. A learned rule aligns a reordered mark as
+    a substitution, so its op counts the same as a plain edit."""
     subs: Counter = Counter()
     lines: dict[tuple[str, str], list[int]] = defaultdict(list)
     occ_src: Counter = Counter()
     occ_tgt: Counter = Counter()
-    model = CostModel()
     for line, _ in aligned:
         occ_src.update(line.src_punct)
         occ_tgt.update(line.tgt_punct)
@@ -503,11 +506,28 @@ def mine_punct(aligned, params: Params) -> list[PunctPair]:
             continue
         s, t = tuple(line.src_punct), tuple(line.tgt_punct)
         for kind, i0, i1, j0, j1 in model.align(s, t):
-            if kind == "edit" and i1 - i0 == 1 and j1 - j0 == 1:
+            if kind in ("edit", "rule") and i1 - i0 == 1 and j1 - j0 == 1 and s[i0] != t[j0]:
                 pair = (s[i0], t[j0])
                 subs[pair] += 1
                 if len(lines[pair]) < MAX_EXAMPLES:
                     lines[pair].append(line.number)
+    return subs, lines, occ_src, occ_tgt
+
+
+def mine_punct(aligned, params: Params) -> list[PunctPair]:
+    # Bootstrap the alignment the way the character rules do: feed each frequent
+    # substitution back as a cheap rule and re-align. Without it, a line where
+    # marks were reordered (nested quotes, for example) aligns the swapped marks
+    # as an insertion plus a deletion, so they are never counted and the forward
+    # probability is understated.
+    rules: list[RuleKey] = []
+    subs, lines, occ_src, occ_tgt = _punct_subs(aligned, CostModel())
+    for _ in range(params.max_iter):
+        new = [((x,), (y,), None, None) for (x, y), c in subs.items() if c >= params.min_count]
+        if set(new) == set(rules):
+            break
+        rules = new
+        subs, lines, occ_src, occ_tgt = _punct_subs(aligned, CostModel(rules))
     out = []
     for (x, y), c in subs.most_common():
         pf, pb = c / max(occ_src[x], c), c / max(occ_tgt[y], c)

@@ -1,7 +1,8 @@
 from collections import Counter
 
-from diff2dict.align import BOUNDARY
-from diff2dict.mine import Params, generalise, mine, ngram_counts, prepare, split_holdout
+from diff2dict.align import BOUNDARY, CostModel
+from diff2dict.mine import (Line, Params, _punct_subs, generalise, mine, ngram_counts, prepare,
+                            split_holdout)
 
 QUIET = dict(log=lambda *_: None)
 NO_PAUSE = dict(ask=lambda _: "")
@@ -56,6 +57,24 @@ def test_sample_punctuation(sample_lines, sample_classes):
     res = run(sample_lines, sample_classes)
     assert {(p.source, p.target, p.direction) for p in res.punct_pairs} == {
         ("“", "«", "both"), ("”", "»", "both")}
+
+
+def _punct_line(number, src_punct, tgt_punct):
+    line = Line(number, "", "", [], [], [], [], list(src_punct), list(tgt_punct))
+    return (line, [])
+
+
+def test_punct_bootstrap_counts_reordered_mark():
+    """A nested-quote line keeps the marks in order but changes every one. Because
+    the same marks appear on both sides, a plain alignment scores some as an
+    insertion plus a deletion, so the closing quote is not counted. Seeding the
+    known swaps as rules, which is what mine_punct does on later passes, makes
+    them align as substitutions and the closing quote is counted."""
+    nested = [_punct_line(1, "‘“”’", "“‘’”")]
+    plain = _punct_subs(nested, CostModel())[0]
+    assert ("’", "”") not in plain
+    seeded = CostModel([(("‘",), ("“",), None, None), (("’",), ("”",), None, None)])
+    assert _punct_subs(nested, seeded)[0][("’", "”")] == 1
 
 
 def test_min_count_drops_rare_rules(sample_lines, sample_classes):
