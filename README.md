@@ -18,18 +18,24 @@ uv sync
 
 ## Workflow
 
-One command mines the differences, writes the outputs and compiles the map. One
-`--name` gives every output file a common stem, and `--out-dir` puts them in one
-folder:
+Make a project folder, then run one command that mines the differences, writes
+the outputs, compiles the map and converts your files:
 
 ```
-uv run diff2dict source.txt target.txt --name English2Dialect --out-dir project
+uv run diff2dict FOLDER source.txt target.txt
 ```
 
-That writes `English2Dialect.map`, `.tec`, `.xlsx`, `_oneway.csv` and
-`_chars.csv` into `project/`. If you give `--lhs-name` and `--rhs-name`, the name
-defaults to `<lhs>2<rhs>`, so you need not set `--name`. Each output can still be
-pointed somewhere else with `--map`, `--out`, `--tec`, `--oneway` or `--chars`.
+`FOLDER` is an existing project folder; `source.txt` and `target.txt` are the two
+aligned texts, in that order. The folder organises everything:
+
+| Path | Holds |
+|---|---|
+| `FOLDER/teckit/` | the generated `<name>.map`, `.tec`, `.xlsx`, `<name>_oneway.csv`, `<name>_chars.csv` |
+| `FOLDER/input/` | the files you want to convert (optional) |
+| `FOLDER/output/` | the converted files |
+
+`<name>` is the folder's own name, so a folder called `British2American` gives
+`British2American.map` and so on.
 
 If the chars file does not exist, it is written with a suggested class for every
 character and the run continues using those suggestions.
@@ -37,7 +43,7 @@ character and the run continues using those suggestions.
 To check the classes first, add `--check-chars`:
 
 ```
-uv run diff2dict source.txt target.txt --name English2Dialect --check-chars
+uv run diff2dict FOLDER source.txt target.txt --check-chars
 ```
 
 The first time, this writes the chars file and stops with the command to run
@@ -49,60 +55,30 @@ column. Leave no class blank. Whitespace always separates words, so it is not
 listed. Run the same command again: it finds the file, pauses for a last check,
 and continues when you press Enter. Re-running keeps the classes you set.
 
-### Convert files with the map
+### Convert files
 
-Add an input folder and the files in it are converted with the compiled map:
+Put the files to convert in `FOLDER/input/` and they are converted with the
+compiled map into `FOLDER/output/`. By default every text file is converted; set
+`--input-ext` to limit it to one extension (with or without the dot; `*`, `.*` or
+`*.*` mean all text files). The scan is not recursive. Add `-r` (or `--reverse`)
+to convert target to source. Conversion uses `txtconv`, so the teckit package must
+be installed; if it is not, the mining outputs are still written and conversion is
+skipped.
 
-```
-uv run diff2dict source.txt target.txt --name English2Dialect \
-    --input-folder texts_in
-```
-
-Converted files go to `<name>_converted` in the output folder. By default every
-text file is converted; set `--input-ext` to limit it to one extension (with or
-without the dot; `*`, `.*` or `*.*` mean all text files). Set `--output-folder`
-to choose the destination. The scan is not recursive. Add `-r` (or `--reverse`)
-to convert target to source. Conversion uses `txtconv`, so the teckit package
-must be installed.
-
-### Save a project
-
-Arguments can be read from a file with `@`, one argument per line. Use the
-`--option=value` form:
-
-```
-# english2dialect.args
-source.txt
-target.txt
---name=English2Dialect
---out-dir=project
---input-folder=texts_in
-```
-
-```
-uv run diff2dict @english2dialect.args
-```
-
-Useful options:
+Options:
 
 | Option | Default | Meaning |
 |---|---|---|
-| `--name` | `<lhs>2<rhs>` or `<source>2<target>` | Stem for every output file |
-| `--out-dir` | `.` | Folder for the output files, created if missing |
 | `--check-chars` | off | Pause to review the character classes before mining |
-| `--input-folder` | | Folder of files to convert with the compiled map |
 | `--input-ext` | all text files | Extension to convert; `*`, `.*` or `*.*` means every text file |
-| `--output-folder` | `<name>_converted` | Where converted files are written; must differ from the input |
 | `-r`, `--reverse` | off | Convert target to source instead of source to target |
-| `--threshold` | 0.7 | Line similarity below which a pair is skipped as unrelated |
-| `--min-count` | 2 | Rules and word pairs seen fewer times are dropped |
-| `--max-iter` | 5 | Bootstrapping passes at most |
-| `--reliability` | 0.95 | Probability a rule must reach in a direction to be used that way |
-| `--holdout` | 0.1 | Share of line pairs kept back to score the map |
-| `--seed` | 1 | Seed for the held-out split |
-| `--review FILE` | | Pause after the first pass so you can edit the mined rules |
-| `--lhs-name`, `--rhs-name` | file names | Names written into the map header |
-| `--map`, `--out`, `--tec`, `--oneway`, `--chars` | from `--name` | Override an individual output path |
+
+Advanced mining options: `--threshold` (0.7, line similarity below which a pair is
+skipped), `--min-count` (2), `--max-iter` (5), `--reliability` (0.95, probability a
+rule must reach in a direction), `--holdout` (0.1, share of lines kept back to
+score the map), `--seed` (1) and `--review FILE` (pause to edit the mined rules).
+The map header names come from the source and target file names, so rename those
+files for nicer header names.
 
 With `--review rules.csv` the first pass writes `rules.csv` and waits. Set
 `keep` to 0 to reject a rule or 1 to force an unreliable one, then press Enter.
@@ -141,13 +117,13 @@ those rules and why.
 
 ## Applying the map
 
-Diff2Dict compiles the map for you and, with `--input-folder`, converts a whole
-folder (see above). To convert a single file yourself, use `txtconv` with the
-compiled `.tec` (add `-r` to convert the other way):
+Diff2Dict compiles the map for you and converts the files in `FOLDER/input`
+(see above). To convert a single file yourself, use `txtconv` with the compiled
+`.tec` (add `-r` to convert the other way):
 
 ```
-txtconv -t rules.tec -i source.txt -o converted.txt -nobom
-txtconv -t rules.tec -i target.txt -o back.txt -r -nobom
+txtconv -t FOLDER/teckit/NAME.tec -i source.txt -o converted.txt -nobom
+txtconv -t FOLDER/teckit/NAME.tec -i target.txt -o back.txt -r -nobom
 ```
 
 Recompile the `.tec` whenever the map changes, or let Diff2Dict do it. The map
@@ -164,14 +140,15 @@ of how TECkit applies the rules. TECkit for Windows, macOS and Linux is at
 ## Example: British to American English
 
 `data/` holds the Open English Bible in its Commonwealth and US editions
-(public domain, from the BibleNLP eBible corpus). `examples/` holds the result
-of:
+(public domain, from the BibleNLP eBible corpus). `examples/British2American/` is
+a project folder whose `teckit/` holds the result of:
 
 ```
-uv run diff2dict data/oeb-british.txt data/oeb-american.txt \
-    --chars examples/oeb-chars.csv --out-dir examples \
-    --lhs-name British --rhs-name American
+uv run diff2dict examples/British2American data/oeb-british.txt data/oeb-american.txt
 ```
+
+Its reviewed `teckit/British2American_chars.csv` is kept in the repo, so the run
+reuses those classes instead of the suggested ones.
 
 It finds word rules such as `honour → honor`, `recognise → recognize` and
 `plough → plow`, and the swap of quotation marks, `‘ → “` and `’ → ”`. On held-out

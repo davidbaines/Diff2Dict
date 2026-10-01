@@ -146,7 +146,7 @@ Lexicon.
 ## Files to create
 
 - `diff2dict/` package:
-  - `cli.py`: one argparse command, `diff2dict SOURCE TARGET [options]`.
+  - `cli.py`: one argparse command, `diff2dict FOLDER SOURCE TARGET [options]`.
   - `unicodetools.py`: NFC, grapheme splitting, char classification, CSV IO.
   - `tokens.py`: line to word and punctuation tokens (class map plus 'both' rule).
     Not named `tokenize.py`, which would shadow the stdlib module.
@@ -171,11 +171,10 @@ Lexicon.
 
 ```
 # uv manages the venv; a `diff2dict` console script is defined in pyproject.toml.
-uv run diff2dict SRC TGT --name NAME --out-dir DIR \
-    [--check-chars] [--threshold 0.7] [--min-count 2] [--max-iter 5] \
-    [--reliability 0.95] [--review rules.csv] \
-    [--input-folder texts_in [--input-ext txt] [--output-folder texts_out] [-r]]
-# Outputs derive from --name; @file reads arguments from a file.
+uv run diff2dict FOLDER SRC TGT \
+    [--check-chars] [--input-ext txt] [-r] \
+    [--threshold 0.7] [--min-count 2] [--max-iter 5] [--reliability 0.95] [--review rules.csv]
+# Outputs go in FOLDER/teckit; FOLDER/input is converted into FOLDER/output.
 ```
 
 ## Verification
@@ -267,13 +266,13 @@ Decisions made while building, which refine the plan above.
   ties a rule with context beats a general one.
 - **Punctuation** rules for a 'both' character carry contexts, so an apostrophe
   inside a word is left alone.
-- **Extra options:** `--holdout` (0.1), `--seed` (1), `--lhs-name`,
-  `--rhs-name` and `--oneway`. In the review CSV, `keep` 0 rejects a rule and
-  1 forces an unreliable one. An existing review file is read without pausing.
+- **Extra options:** `--holdout` (0.1), `--seed` (1) and `--review`. In the review
+  CSV, `keep` 0 rejects a rule and 1 forces an unreliable one. An existing review
+  file is read without pausing.
 - **Extra sheets:** Summary comes first; CaseOnly lists pairs that differ only
   in case.
 - **txtconv 2.5.12 on Windows** occasionally crashes (about once in 60 runs on
   the same input), so evaluation retries three times, and a failure is noted
   in the Summary instead of stopping the run.
 - **Real data:** `data/` holds the Open English Bible in Commonwealth and US
-  spelling, and `examples/` holds the resulting `British2American.map`.
+  spelling, and `examples/British2American/teckit/` holds the resulting map.

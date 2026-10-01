@@ -52,13 +52,12 @@ The design came out of an interview. The main decisions, in order:
 
 - `diff2dict/` package: `unicodetools.py`, `tokens.py`, `align.py`, `mine.py`,
   `teckit.py`, `report.py`, `cli.py`.
-- Command: `diff2dict SOURCE TARGET [options]` (add `--check-chars` to review the
-  character classes first, `--input-folder` to convert files with the map).
-- `--name` and `--out-dir` give every output a common stem in one folder;
-  `@file` reads arguments from a file.
-- Outputs (named from `--name`): `<name>.xlsx` (Summary, CharPairs, WordPairs,
-  Lexicon, PunctPairs, CaseOnly, SkippedLines), `<name>.map`, `<name>.tec`,
-  `<name>_oneway.csv` and `<name>_chars.csv`.
+- Command: `diff2dict FOLDER SOURCE TARGET [options]`. FOLDER is a project folder;
+  `--check-chars` pauses to review the character classes first.
+- Outputs go in `FOLDER/teckit`, named from FOLDER: `<name>.xlsx` (Summary,
+  CharPairs, WordPairs, Lexicon, PunctPairs, CaseOnly, SkippedLines), `<name>.map`,
+  `<name>.tec`, `<name>_oneway.csv` and `<name>_chars.csv`. Files in `FOLDER/input`
+  are converted into `FOLDER/output`.
 - `sample/`: a small invented dialect pair covering `a → aa`, word-final `e`
   deletion, the one-way merger `oe → o`, a genuine swap (`pin → hunu`), a
   compound split (`ropilo → ropi lo`), a deleted particle, a quote swap,
@@ -66,10 +65,10 @@ The design came out of an interview. The main decisions, in order:
   combining macron, digits and apostrophes.
 - `tests/`: 82 pytest tests. The TECkit tests compile maps and convert text
   with the real tools when they are on the PATH or `TECKIT_DIR` points to them.
-- `data/` and `examples/`: the Open English Bible in Commonwealth and US
-  spelling (public domain, from the BibleNLP eBible corpus), and the resulting
-  `British2American.map`, workbook and one-way report. The WEB and LXX2012
-  files in that corpus turned out to be empty, so the OEB was used.
+- `data/` and `examples/British2American/`: the Open English Bible in Commonwealth
+  and US spelling (public domain, from the BibleNLP eBible corpus), and the
+  resulting `teckit/British2American.map`, workbook and one-way report. The WEB and
+  LXX2012 files in that corpus turned out to be empty, so the OEB was used.
 
 ## Results
 
@@ -166,10 +165,8 @@ for good.
 ```
 uv sync
 TECKIT_DIR=/path/to/teckit/bin uv run pytest
-uv run diff2dict data/oeb-british.txt data/oeb-american.txt \
-    --chars examples/oeb-chars.csv --out-dir examples \
-    --lhs-name British --rhs-name American
+uv run diff2dict examples/British2American data/oeb-british.txt data/oeb-american.txt
 ```
 
-With `teckit_compile` and `txtconv` on the PATH, `run` also scores the map
+With `teckit_compile` and `txtconv` on the PATH, the run also scores the map
 with TECkit, and the Summary sheet shows the result.

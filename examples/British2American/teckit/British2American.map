@@ -2,8 +2,8 @@
 ; LHS is the source text, RHS the target. Rules marked > or < work in one
 ; direction only; the one-way rules report explains why.
 
-LHSName "British"
-RHSName "American"
+LHSName "oeb-british"
+RHSName "oeb-american"
 LHSDescription "Text as in oeb-british.txt"
 RHSDescription "Text as in oeb-american.txt"
 Version "1"

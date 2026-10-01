@@ -1,8 +1,8 @@
-"""Command line: `diff2dict SOURCE TARGET [options]`.
+"""Command line: `diff2dict FOLDER SOURCE TARGET [options]`.
 
-Mines the differences between two line-aligned texts, writes the TECkit map,
-the workbook and the one-way report, compiles the map to a .tec, and can convert
-a folder of text files with it.
+FOLDER is a project folder. The mined TECkit map, compiled table, workbook and
+one-way report are written to FOLDER/teckit; the files in FOLDER/input (if any)
+are converted with the map into FOLDER/output.
 """
 
 import argparse
@@ -88,38 +88,24 @@ def select_files(folder: Path, ext: str) -> list[Path]:
 
 
 def _derive_paths(args: argparse.Namespace) -> None:
-    """Fill in the output paths that were not given, from --name and --out-dir."""
-    name = args.name
-    if not name:
-        if args.lhs_name and args.rhs_name:
-            name = f"{args.lhs_name}2{args.rhs_name}"
-        else:
-            name = f"{args.source.stem}2{args.target.stem}"
-    d = args.out_dir
-    args.chars = args.chars or d / f"{name}_chars.csv"
-    args.map = args.map or d / f"{name}.map"
-    args.tec = args.tec or d / f"{name}.tec"
-    args.out = args.out or d / f"{name}.xlsx"
-    args.oneway = args.oneway or d / f"{name}_oneway.csv"
-    args.output_folder = args.output_folder or d / f"{name}_converted"
-
-
-def _validate_conversion(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
-    """Check conversion arguments and tools before any mining, so a mistake costs
-    nothing. Exits through parser.error."""
-    if not args.input_folder.is_dir():
-        parser.error(f"input folder not found: {args.input_folder}")
-    if args.input_folder.resolve() == args.output_folder.resolve():
-        parser.error("the input and output folders must be different")
-    compiler, txtconv = teckit.find_tools()
-    if not compiler or not txtconv:
-        parser.error("conversion needs teckit_compile and txtconv on PATH; "
-                     "install the teckit package")
+    """Set every output path from the project folder. The folder's name is the
+    stem, FOLDER/teckit holds the generated files, FOLDER/input is converted into
+    FOLDER/output."""
+    name = args.folder.resolve().name
+    d = args.folder / "teckit"
+    args.out_dir = d
+    args.chars = d / f"{name}_chars.csv"
+    args.map = d / f"{name}.map"
+    args.tec = d / f"{name}.tec"
+    args.out = d / f"{name}.xlsx"
+    args.oneway = d / f"{name}_oneway.csv"
+    args.input_folder = args.folder / "input"
+    args.output_folder = args.folder / "output"
 
 
 def _convert_folder(args: argparse.Namespace, tec: Path, txtconv: str) -> int:
-    """Convert every matching file into the output folder. Returns the number of
-    files that failed."""
+    """Convert every matching file in FOLDER/input into FOLDER/output. Returns the
+    number of files that failed."""
     files = select_files(args.input_folder, args.input_ext)
     args.output_folder.mkdir(parents=True, exist_ok=True)
     failures = 0
@@ -139,11 +125,19 @@ def _convert_folder(args: argparse.Namespace, tec: Path, txtconv: str) -> int:
 
 def run(args: argparse.Namespace, invocation: str, parser: argparse.ArgumentParser,
         ask: Callable[[str], str] = input) -> int:
+    if not args.folder.is_dir():
+        parser.error(f"folder not found: {args.folder}")
+    if not args.folder.resolve().name:
+        parser.error("FOLDER must be a named directory, not the filesystem root")
     _derive_paths(args)
-    convert = args.input_folder is not None
-    if convert:
-        _validate_conversion(args, parser)
     args.out_dir.mkdir(parents=True, exist_ok=True)
+
+    compiler, txtconv = teckit.find_tools()
+    convert = args.input_folder.is_dir()
+    if convert and (not compiler or not txtconv):
+        print("Found FOLDER/input but teckit is not installed, so files were not "
+              "converted. Install the teckit package to convert them.", file=sys.stderr)
+        convert = False
 
     classes = resolve_chars(args, invocation, ask)
     if classes is None:
@@ -156,14 +150,11 @@ def run(args: argparse.Namespace, invocation: str, parser: argparse.ArgumentPars
                     args.holdout, args.seed, args.review)
     result = mine(src_lines, tgt_lines, classes, params)
 
-    lhs = args.lhs_name or args.source.stem
-    rhs = args.rhs_name or args.target.stem
     teckit.write_map(args.map, result.map_rules, result.word_chars, result.mark_chars,
-                     result.both_chars,
-                     lhs, rhs, f"Text as in {args.source.name}", f"Text as in {args.target.name}")
-    oneway = args.oneway
-    report.write_oneway_csv(oneway, teckit.oneway_rows(result.map_rules, result.unmapped,
-                                                       params.reliability))
+                     result.both_chars, args.source.stem, args.target.stem,
+                     f"Text as in {args.source.name}", f"Text as in {args.target.name}")
+    report.write_oneway_csv(args.oneway, teckit.oneway_rows(result.map_rules, result.unmapped,
+                                                            params.reliability))
     tk = teckit.teckit_evaluate(args.map, result.held, classes)
 
     ev = result.evaluation
@@ -201,13 +192,12 @@ def run(args: argparse.Namespace, invocation: str, parser: argparse.ArgumentPars
     for k, v in tk.items():
         summary[k.replace("_", " ")] = round(v, 4) if isinstance(v, float) else v
     report.write_workbook(args.out, result, summary)
-    print(f"Wrote {args.out}, {args.map} and {oneway}.")
+    print(f"Wrote {args.out}, {args.map} and {args.oneway}.")
     if ev["held_lines"]:
         print(f"Held-out word accuracy: {ev['baseline']:.3f} before, "
               f"{ev['forward']:.3f} forward, {ev['backward']:.3f} backward (simulated).")
 
     tec = args.tec
-    compiler, txtconv = teckit.find_tools()
     if convert:
         ok, message = teckit.compile_map(compiler, args.map, tec)
         if not ok:
@@ -226,44 +216,26 @@ def run(args: argparse.Namespace, invocation: str, parser: argparse.ArgumentPars
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="diff2dict", fromfile_prefix_chars="@", description=(
-        "Mine character rules and word substitutions from two line-aligned texts, "
-        "write them as a TECkit map, compile it, and optionally convert a folder. "
-        "Arguments can be read from a file with @file, one argument per line."))
+    p = argparse.ArgumentParser(prog="diff2dict", description=(
+        "Mine the differences between two line-aligned texts into a TECkit map, "
+        "compile it, and convert the files in FOLDER/input."))
     p.add_argument("--version", action="version", version=__version__)
-    p.add_argument("source", type=Path)
-    p.add_argument("target", type=Path)
-    p.add_argument("--name", default=None,
-                   help="stem for the output files (default: <lhs-name>2<rhs-name>, "
-                        "or <source>2<target>)")
-    p.add_argument("--out-dir", type=Path, default=Path("."),
-                   help="folder for the output files, created if missing (default: .)")
-    p.add_argument("--chars", type=Path, default=None,
-                   help="character classes (default: <name>_chars.csv in the output folder)")
+    p.add_argument("folder", type=Path,
+                   help="project folder: FOLDER/teckit holds the generated map, table and "
+                        "report; files in FOLDER/input are converted into FOLDER/output")
+    p.add_argument("source", type=Path, help="source text, one unit per line")
+    p.add_argument("target", type=Path, help="target text, aligned line for line")
     p.add_argument("--check-chars", action="store_true",
                    help="pause to review the character classes before mining")
-    p.add_argument("--out", type=Path, default=None,
-                   help="workbook (default: <name>.xlsx in the output folder)")
-    p.add_argument("--map", type=Path, default=None,
-                   help="TECkit map (default: <name>.map in the output folder)")
-    p.add_argument("--tec", type=Path, default=None,
-                   help="compiled table (default: <name>.tec in the output folder)")
-    p.add_argument("--oneway", type=Path, default=None,
-                   help="one-way rules report (default: <name>_oneway.csv in the output folder)")
 
     c = p.add_argument_group("conversion")
-    c.add_argument("--input-folder", type=Path, default=None,
-                   help="convert the files in this folder (not recursive)")
     c.add_argument("--input-ext", default="*",
                    help="extension to convert, with or without the dot; "
                         "*, .* or *.* means every text file (default: all text files)")
-    c.add_argument("--output-folder", type=Path, default=None,
-                   help="where converted files are written; must differ from the input "
-                        "(default: <name>_converted in the output folder)")
     c.add_argument("-r", "--reverse", action="store_true",
                    help="convert target to source instead of source to target")
 
-    m = p.add_argument_group("mining")
+    m = p.add_argument_group("advanced")
     m.add_argument("--threshold", type=float, default=0.7,
                    help="line similarity below which a pair is skipped (default 0.7)")
     m.add_argument("--min-count", type=int, default=2)
@@ -275,8 +247,6 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("--seed", type=int, default=1, help="seed for the held-out split")
     m.add_argument("--review", type=Path, default=None,
                    help="pause after the first pass to edit this rules CSV")
-    m.add_argument("--lhs-name", default=None)
-    m.add_argument("--rhs-name", default=None)
     return p
 
 
