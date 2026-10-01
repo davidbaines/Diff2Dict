@@ -39,6 +39,13 @@ combine it there by hand.
 The map header names come from the source and target file names. There are no
 per-output path flags: the folder convention fixes every path.
 
+## Finding the texts
+
+`SOURCE` and `TARGET` are searched for in `CORPUS_DIR` (from the environment or a
+`.env` file), then `FOLDER`, then the current directory; the first place holding
+both is used, and the run prints which it was and the full paths. If they are not
+both found, it lists what was found and the folders searched.
+
 ## Behaviour
 
 - A missing or non-directory `FOLDER` is an error.

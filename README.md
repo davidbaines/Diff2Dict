@@ -37,6 +37,21 @@ aligned texts, in that order. The folder organises everything:
 `<name>` is the folder's own name, so a folder called `British2American` gives
 `British2American.map` and so on.
 
+### Where the texts are found
+
+`source.txt` and `target.txt` are looked for in this order, and the first place
+that holds both is used: the folder named by `CORPUS_DIR`, then `FOLDER`, then the
+current directory. The run prints the full path of each text and which of the three
+it came from. If they cannot both be found in one place, it lists what was found
+and where it looked.
+
+Set `CORPUS_DIR` in the environment, or in a `.env` file beside where you run the
+command. Copy `.env.example` to `.env` and set the path:
+
+```
+CORPUS_DIR=/path/to/your/corpora
+```
+
 If the chars file does not exist, it is written with a suggested class for every
 character and the run continues using those suggestions.
 

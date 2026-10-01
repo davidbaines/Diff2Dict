@@ -6,6 +6,7 @@ are converted with the map into FOLDER/output.
 """
 
 import argparse
+import os
 import shlex
 import sys
 from collections.abc import Callable
@@ -87,6 +88,57 @@ def select_files(folder: Path, ext: str) -> list[Path]:
     return [p for p in files if p.suffix.lower() == suffix]
 
 
+def load_dotenv(path: Path = Path(".env")) -> None:
+    """Set variables from KEY=VALUE lines of a .env file, without overriding the
+    environment. Blank lines and # comments are ignored. No dependency."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+def _resolve_inputs(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    """Find SOURCE and TARGET under CORPUS_DIR, then FOLDER, then the current
+    directory, using the first place that holds both. Sets args.source/target to
+    the paths found and reports where. Exits through parser.error if not found."""
+    roots: list[tuple[str, Path]] = []
+    corpus = os.environ.get("CORPUS_DIR")
+    if corpus:
+        roots.append(("CORPUS_DIR", Path(corpus)))
+    roots += [("FOLDER", args.folder), ("CWD", Path.cwd())]
+    seen: set[Path] = set()
+    unique = [(label, root) for label, root in roots
+              if root.resolve() not in seen and not seen.add(root.resolve())]
+
+    found_source: list[tuple[str, Path]] = []
+    found_target: list[tuple[str, Path]] = []
+    for label, root in unique:
+        sp, tp = root / args.source, root / args.target
+        if sp.is_file():
+            found_source.append((label, sp))
+        if tp.is_file():
+            found_target.append((label, tp))
+        if sp.is_file() and tp.is_file():
+            print(f"Found the input texts via {label}:")
+            print(f"  source: {sp.resolve()}")
+            print(f"  target: {tp.resolve()}")
+            args.source, args.target = sp, tp
+            return
+
+    lines = [f"could not find both '{args.source}' and '{args.target}' in one place.",
+             "searched:"]
+    lines += [f"  {label}: {root.resolve()}" for label, root in unique]
+    lines.append("found source: " + (", ".join(f"{p} ({l})" for l, p in found_source) or "nowhere"))
+    lines.append("found target: " + (", ".join(f"{p} ({l})" for l, p in found_target) or "nowhere"))
+    parser.error("\n".join(lines))
+
+
 def _derive_paths(args: argparse.Namespace) -> None:
     """Set every output path from the project folder. The folder's name is the
     stem, FOLDER/teckit holds the generated files, FOLDER/input is converted into
@@ -129,6 +181,7 @@ def run(args: argparse.Namespace, invocation: str, parser: argparse.ArgumentPars
         parser.error(f"folder not found: {args.folder}")
     if not args.folder.resolve().name:
         parser.error("FOLDER must be a named directory, not the filesystem root")
+    _resolve_inputs(args, parser)
     _derive_paths(args)
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -254,6 +307,7 @@ def main(argv: list[str] | None = None, ask: Callable[[str], str] = input) -> in
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(errors="replace")
+    load_dotenv()
     parser = build_parser()
     args = parser.parse_args(argv)
     shown = argv if argv is not None else sys.argv[1:]

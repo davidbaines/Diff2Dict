@@ -88,6 +88,36 @@ def test_missing_folder_errors(tmp_path):
         main([str(tmp_path / "nope"), str(src), str(tgt), "--holdout", "0"])
 
 
+def test_inputs_resolved_relative_to_folder(tmp_path, monkeypatch):
+    monkeypatch.delenv("CORPUS_DIR", raising=False)
+    folder = tmp_path / "proj"
+    folder.mkdir()
+    for name in ("source.txt", "target.txt"):
+        shutil.copy(SAMPLE / name, folder / name)
+    assert main([str(folder), "source.txt", "target.txt", "--holdout", "0"]) == 0
+    assert (folder / "teckit" / "proj.map").exists()
+
+
+def test_corpus_dir_resolves_inputs(tmp_path, monkeypatch):
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    for name in ("source.txt", "target.txt"):
+        shutil.copy(SAMPLE / name, corpus / name)
+    monkeypatch.setenv("CORPUS_DIR", str(corpus))
+    folder = tmp_path / "proj"
+    folder.mkdir()
+    assert main([str(folder), "source.txt", "target.txt", "--holdout", "0"]) == 0
+    assert (folder / "teckit" / "proj.map").exists()
+
+
+def test_inputs_not_found_errors(tmp_path, monkeypatch):
+    monkeypatch.delenv("CORPUS_DIR", raising=False)
+    folder = tmp_path / "proj"
+    folder.mkdir()
+    with pytest.raises(SystemExit):
+        main([str(folder), "missing_source.txt", "missing_target.txt", "--holdout", "0"])
+
+
 def test_select_files_by_extension_and_all_text(tmp_path):
     (tmp_path / "a.txt").write_text("hello", encoding="utf-8")
     (tmp_path / "b.sfm").write_text("\\v 1 world", encoding="utf-8")
